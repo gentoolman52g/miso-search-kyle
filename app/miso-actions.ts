@@ -237,7 +237,7 @@ export async function fetchAllDocuments(): Promise<{ data?: Array<{id: string, n
 export async function checkSegmentDuplicates(
   datasetId: string, 
   documentId: string, 
-  type: 'regulation' | 'faq'
+  type: 'regulation' | 'faq' | 'notice'
 ): Promise<{ 
   data?: { existingIds: string[], lastId?: string, suggestedId?: string }; 
   error?: string 
@@ -258,7 +258,7 @@ export async function checkSegmentDuplicates(
 }
 
 export async function checkSegmentDuplicatesInAllDatasets(
-  type: 'regulation' | 'faq'
+  type: 'regulation' | 'faq' | 'notice'
 ): Promise<{ 
   data?: { existingIds: string[], lastId?: string, suggestedId?: string }; 
   error?: string 

@@ -28,7 +28,7 @@ interface SegmentModalProps {
   editSegment?: EditSegmentData // 편집할 세그먼트 데이터 (없으면 추가 모드)
 }
 
-type SegmentType = 'regulation' | 'faq'
+type SegmentType = 'regulation' | 'faq' | 'notice'
 
 interface RegulationData {
   documentName: string
@@ -44,6 +44,14 @@ interface FaqData {
   topic: string
   question: string
   answer: string
+}
+
+interface NoticeData {
+  rowId: string
+  title: string
+  documentType: string
+  createdDate: string
+  content: string
 }
 
 interface Document {
@@ -132,6 +140,42 @@ const parseFaqSegment = (content: string): FaqData => {
   return faq
 }
 
+const parseNoticeSegment = (content: string): NoticeData => {
+  const notice: NoticeData = {
+    rowId: '',
+    title: '',
+    documentType: '',
+    createdDate: '',
+    content: ''
+  }
+
+  const parts = content.split(';')
+  for (const part of parts) {
+    const [key, value] = part.split(':').map(s => s.trim())
+    if (!key || !value) continue
+
+    switch (key) {
+      case 'row_id':
+        notice.rowId = value
+        break
+      case '제목':
+        notice.title = value
+        break
+      case '문서유형':
+        notice.documentType = value
+        break
+      case '작성일':
+        notice.createdDate = value
+        break
+      case '전체텍스트':
+        notice.content = value
+        break
+    }
+  }
+
+  return notice
+}
+
 export const SegmentModal: React.FC<SegmentModalProps> = ({
   isOpen,
   onClose,
@@ -169,6 +213,14 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
     answer: ''
   })
 
+  const [noticeData, setNoticeData] = useState<NoticeData>({
+    rowId: '',
+    title: '',
+    documentType: '',
+    createdDate: '',
+    content: ''
+  })
+
   // 편집 모드에서 기존 데이터로 폼 초기화
   const initializeEditData = useCallback(() => {
     if (!editSegment) return
@@ -176,9 +228,14 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
     // 세그먼트 타입 결정 (content 분석)
     const content = editSegment.content
     const isRegulation = content.includes('조번호:')
-    const isFaq = content.includes('row_id:')
+    const isFaq = content.includes('row_id:') && content.includes('주제:') && content.includes('질문:')
+    const isNotice = content.includes('row_id:') && content.includes('제목:') && content.includes('문서유형:')
     
-    if (isRegulation) {
+    if (isNotice) {
+      setSegmentType('notice')
+      const parsedData = parseNoticeSegment(content)
+      setNoticeData(parsedData)
+    } else if (isRegulation) {
       setSegmentType('regulation')
       const parsedData = parseRegulationSegment(content)
       setRegulationData(parsedData)
@@ -222,6 +279,13 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
         question: '',
         answer: ''
       })
+      setNoticeData({
+        rowId: '',
+        title: '',
+        documentType: '',
+        createdDate: '',
+        content: ''
+      })
     }
   }, [isEditMode])
 
@@ -260,11 +324,13 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
     if (duplicateCheckResult?.suggestedId && !isEditMode) {
       if (segmentType === 'faq' && !faqData.rowId) {
         setFaqData(prev => ({ ...prev, rowId: duplicateCheckResult.suggestedId || '' }))
+      } else if (segmentType === 'notice' && !noticeData.rowId) {
+        setNoticeData(prev => ({ ...prev, rowId: duplicateCheckResult.suggestedId || '' }))
       } else if (segmentType === 'regulation' && !regulationData.articleNumber) {
         setRegulationData(prev => ({ ...prev, articleNumber: duplicateCheckResult.suggestedId || '' }))
       }
     }
-  }, [duplicateCheckResult, segmentType, faqData.rowId, regulationData.articleNumber, isEditMode])
+  }, [duplicateCheckResult, segmentType, faqData.rowId, noticeData.rowId, regulationData.articleNumber, isEditMode])
 
   const loadAllDocuments = async () => {
     setIsLoadingDocuments(true)
@@ -322,7 +388,13 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
   }
 
   const getCurrentId = (): string => {
-    return segmentType === 'faq' ? faqData.rowId : regulationData.articleNumber
+    if (segmentType === 'faq') {
+      return faqData.rowId
+    } else if (segmentType === 'notice') {
+      return noticeData.rowId
+    } else {
+      return regulationData.articleNumber
+    }
   }
 
   const getCurrentIdFromEditSegment = (): string => {
@@ -330,6 +402,9 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
     
     const content = editSegment.content
     if (segmentType === 'faq') {
+      const match = content.match(/row_id:\s*([^;]+)/i)
+      return match ? match[1].trim() : ''
+    } else if (segmentType === 'notice') {
       const match = content.match(/row_id:\s*([^;]+)/i)
       return match ? match[1].trim() : ''
     } else {
@@ -348,16 +423,16 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
     if (currentId && duplicateCheckResult && !isEditMode) {
       if (checkCurrentIdDuplicate(currentId)) {
         const lastIdInfo = duplicateCheckResult.lastId 
-          ? ` 현재 마지막 ${segmentType === 'faq' ? 'Row ID' : '조번호'}는 ${duplicateCheckResult.lastId}입니다.`
+          ? ` 현재 마지막 ${segmentType === 'faq' ? 'Row ID' : segmentType === 'notice' ? 'row_id' : '조번호'}는 ${duplicateCheckResult.lastId}입니다.`
           : ''
-        setDuplicateWarning(`중복된 ${segmentType === 'faq' ? 'Row ID' : '조번호'}입니다.${lastIdInfo}`)
+        setDuplicateWarning(`중복된 ${segmentType === 'faq' ? 'Row ID' : segmentType === 'notice' ? 'row_id' : '조번호'}입니다.${lastIdInfo}`)
       } else {
         setDuplicateWarning(null)
       }
     } else {
       setDuplicateWarning(null)
     }
-  }, [faqData.rowId, regulationData.articleNumber, duplicateCheckResult, segmentType, isEditMode])
+  }, [faqData.rowId, noticeData.rowId, regulationData.articleNumber, duplicateCheckResult, segmentType, isEditMode])
 
   if (!isOpen) return null
 
@@ -371,12 +446,20 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
       if (regulationData.articleTitle) fields.push(`조제목: ${regulationData.articleTitle}`)
       if (regulationData.content) fields.push(`내용: ${regulationData.content}`)
       return fields.join(';')
-    } else {
+    } else if (segmentType === 'faq') {
       const fields = []
       if (faqData.rowId) fields.push(`row_id: ${faqData.rowId}`)
       if (faqData.topic) fields.push(`주제: ${faqData.topic}`)
       if (faqData.question) fields.push(`질문: ${faqData.question}`)
       if (faqData.answer) fields.push(`답변: ${faqData.answer}`)
+      return fields.join(';')
+    } else {
+      const fields = []
+      if (noticeData.rowId) fields.push(`row_id: ${noticeData.rowId}`)
+      if (noticeData.title) fields.push(`제목: ${noticeData.title}`)
+      if (noticeData.documentType) fields.push(`문서유형: ${noticeData.documentType}`)
+      if (noticeData.createdDate) fields.push(`작성일: ${noticeData.createdDate}`)
+      if (noticeData.content) fields.push(`전체텍스트: ${noticeData.content}`)
       return fields.join(';')
     }
   }
@@ -390,7 +473,7 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
       if (!isEditMode) {
         const currentId = getCurrentId()
         if (currentId && checkCurrentIdDuplicate(currentId)) {
-          setError(`중복된 ${segmentType === 'faq' ? 'Row ID' : '조번호'}입니다. 다른 ID를 사용해주세요.`)
+          setError(`중복된 ${segmentType === 'faq' ? 'Row ID' : segmentType === 'notice' ? 'row_id' : '조번호'}입니다. 다른 ID를 사용해주세요.`)
           return
         }
       }
@@ -446,10 +529,8 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
   const isFormValid = () => {
     const hasValidContent = segmentType === 'regulation' 
       ? regulationData.content.trim() !== ''
-      : faqData.rowId.trim() !== '' && 
-        faqData.topic.trim() !== '' && 
-        faqData.question.trim() !== '' && 
-        faqData.answer.trim() !== ''
+      : segmentType === 'faq' ? faqData.rowId.trim() !== '' && faqData.topic.trim() !== '' && faqData.question.trim() !== '' && faqData.answer.trim() !== ''
+      : noticeData.rowId.trim() !== '' && noticeData.title.trim() !== '' && noticeData.documentType.trim() !== '' && noticeData.createdDate.trim() !== '' && noticeData.content.trim() !== ''
         
     const noDuplicates = isEditMode || !checkCurrentIdDuplicate(getCurrentId())
         
@@ -537,6 +618,26 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
                     </div>
                   </div>
                 </button>
+
+                <button
+                  onClick={() => !isEditMode && setSegmentType('notice')}
+                  disabled={isEditMode}
+                  className={`p-4 rounded-xl border-2 transition-all text-left ${
+                    segmentType === 'notice' 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  } ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <File className={`w-5 h-5 ${segmentType === 'notice' ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <div>
+                      <div className={`font-medium ${segmentType === 'notice' ? 'text-blue-900' : 'text-gray-900'}`}>
+                        공지사항
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">회사 공지사항</div>
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -615,7 +716,7 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
                     <div className="flex-1">
                       <h3 className="text-sm font-medium text-green-900 mb-1">중복검사 완료</h3>
                       <div className="text-xs text-green-700 space-y-1">
-                        <div>이 문서의 기존 {segmentType === 'faq' ? 'Row ID' : '조번호'}: {duplicateCheckResult.existingIds.length}개</div>
+                        <div>이 문서의 기존 {segmentType === 'faq' ? 'Row ID' : segmentType === 'notice' ? 'row_id' : '조번호'}: {duplicateCheckResult.existingIds.length}개</div>
                         {duplicateCheckResult.suggestedId && (
                           <div className="font-medium">💡 제안 ID: {duplicateCheckResult.suggestedId}</div>
                         )}
@@ -761,6 +862,68 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
                       onChange={(e) => setFaqData(prev => ({ ...prev, answer: e.target.value }))}
                       placeholder="질문에 대한 상세한 답변을 입력해주세요"
                       className="min-h-[100px] border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 공지사항 폼 */}
+              {segmentType === 'notice' && (
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Row ID *</Label>
+                    <Input
+                      value={noticeData.rowId}
+                      onChange={(e) => setNoticeData(prev => ({ ...prev, rowId: e.target.value }))}
+                      placeholder="예: NOTICE_01"
+                      className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">제목 *</Label>
+                      <Input
+                        value={noticeData.title}
+                        onChange={(e) => setNoticeData(prev => ({ ...prev, title: e.target.value }))}
+                        placeholder="예: 2025년 LNG 기술 교육 안내"
+                        className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">문서유형 *</Label>
+                      <Input
+                        value={noticeData.documentType}
+                        onChange={(e) => setNoticeData(prev => ({ ...prev, documentType: e.target.value }))}
+                        placeholder="예: 교육"
+                        className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">작성일 *</Label>
+                    <Input
+                      value={noticeData.createdDate}
+                      onChange={(e) => setNoticeData(prev => ({ ...prev, createdDate: e.target.value }))}
+                      placeholder="예: 2025-03-19"
+                      type="date"
+                      className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">전체텍스트 *</Label>
+                    <Textarea
+                      value={noticeData.content}
+                      onChange={(e) => setNoticeData(prev => ({ ...prev, content: e.target.value }))}
+                      placeholder="공지사항의 전체 내용을 입력해주세요"
+                      className="min-h-[120px] border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
                       required
                     />
                   </div>

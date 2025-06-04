@@ -24,7 +24,17 @@ export interface ParsedFaqSegment {
   originalContent: string
 }
 
-export type ParsedSegment = ParsedRegulationSegment | ParsedFaqSegment
+export interface ParsedNoticeSegment {
+  type: 'notice'
+  rowId: string
+  title: string
+  documentType: string
+  createdDate: string
+  content: string
+  originalContent: string
+}
+
+export type ParsedSegment = ParsedRegulationSegment | ParsedFaqSegment | ParsedNoticeSegment
 
 /**
  * 인사규정 형식의 콘텐츠를 파싱합니다
@@ -91,6 +101,36 @@ function parseFaqContent(content: string): ParsedFaqSegment | null {
 }
 
 /**
+ * 공지사항 형식의 콘텐츠를 파싱합니다
+ * 형식: "row_id: NOTICE_07;제목: 2025년 LNG 기술 교육(가스터빈 기초) 수강 안내;문서유형: 교육;작성일: 2025-03-19;전체텍스트: ..."
+ */
+function parseNoticeContent(content: string): ParsedNoticeSegment | null {
+  // 세미콜론으로 구분된 필드들을 파싱
+  const fields = content.split(';').reduce((acc, field) => {
+    const [key, ...valueParts] = field.split(':')
+    if (key && valueParts.length > 0) {
+      acc[key.trim()] = valueParts.join(':').trim()
+    }
+    return acc
+  }, {} as Record<string, string>)
+
+  // 필수 필드 확인
+  if (!fields['row_id'] || !fields['제목'] || !fields['문서유형'] || !fields['작성일'] || !fields['전체텍스트']) {
+    return null
+  }
+
+  return {
+    type: 'notice',
+    rowId: fields['row_id'],
+    title: fields['제목'],
+    documentType: fields['문서유형'],
+    createdDate: fields['작성일'],
+    content: fields['전체텍스트'],
+    originalContent: content
+  }
+}
+
+/**
  * 세그먼트 콘텐츠를 자동으로 감지하고 파싱합니다
  */
 export function parseSegmentContent(content: string): ParsedSegment | null {
@@ -98,7 +138,12 @@ export function parseSegmentContent(content: string): ParsedSegment | null {
     return null
   }
 
-  // FAQ 형식 감지 (row_id로 시작)
+  // 공지사항 형식 감지 (NOTICE로 시작하는 row_id와 제목 필드)
+  if (content.includes('row_id:') && content.includes('제목:') && content.includes('문서유형:') && content.includes('작성일:')) {
+    return parseNoticeContent(content)
+  }
+
+  // FAQ 형식 감지 (row_id로 시작하지만 공지사항이 아닌 경우)
   if (content.includes('row_id:')) {
     return parseFaqContent(content)
   }

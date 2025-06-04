@@ -3,8 +3,8 @@
 import React, { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { FileText, HelpCircle, BookOpen, Hash, X, Eye, EyeOff } from 'lucide-react'
-import { ParsedSegment, ParsedRegulationSegment, ParsedFaqSegment } from '@/lib/segment-parser'
+import { FileText, HelpCircle, BookOpen, Hash, X, Eye, EyeOff, MessageCircle, File, Calendar, Tag } from 'lucide-react'
+import { ParsedSegment, ParsedRegulationSegment, ParsedFaqSegment, ParsedNoticeSegment } from '@/lib/segment-parser'
 
 interface ParsedSegmentModalProps {
   isOpen: boolean
@@ -122,6 +122,55 @@ const FaqModalContent = ({
   </div>
 )
 
+const NoticeModalContent = ({ 
+  segment, 
+  docColor 
+}: { 
+  segment: ParsedNoticeSegment
+  docColor: any
+}) => (
+  <div className="space-y-6">
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-medium text-muted-foreground mb-2">공지사항 정보</h3>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Badge variant="outline" className={`text-sm ${docColor.accent} border-current px-3 py-1`}>
+            공지사항
+          </Badge>
+          <Badge variant="secondary" className="text-sm px-3 py-1">
+            {segment.documentType}
+          </Badge>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5" />
+            <span>{segment.createdDate}</span>
+          </div>
+          <span className="text-sm text-muted-foreground">
+            {segment.rowId}
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    <div>
+      <h3 className="text-sm font-medium text-muted-foreground mb-3">제목</h3>
+      <div className="bg-muted/30 rounded-xl p-4">
+        <h2 className="text-lg font-semibold leading-relaxed">
+          {segment.title}
+        </h2>
+      </div>
+    </div>
+    
+    <div>
+      <h3 className="text-sm font-medium text-muted-foreground mb-3">전체 내용</h3>
+      <div className={`${docColor.bg} rounded-xl p-4 border ${docColor.border}`}>
+        <p className="text-base leading-relaxed whitespace-pre-wrap">
+          {segment.content}
+        </p>
+      </div>
+    </div>
+  </div>
+)
+
 export const ParsedSegmentModal: React.FC<ParsedSegmentModalProps> = ({
   isOpen,
   onClose,
@@ -132,6 +181,19 @@ export const ParsedSegmentModal: React.FC<ParsedSegmentModalProps> = ({
 
   if (!isOpen || !parsedSegment) return null
 
+  const getTitle = () => {
+    switch (parsedSegment.type) {
+      case 'regulation':
+        return parsedSegment.documentName || '규정 문서'
+      case 'faq':
+        return 'FAQ'
+      case 'notice':
+        return '공지사항'
+      default:
+        return '세그먼트'
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -141,10 +203,7 @@ export const ParsedSegmentModal: React.FC<ParsedSegmentModalProps> = ({
             <div className="flex items-center gap-3">
               <div>
                 <h2 className={`text-lg font-semibold ${docColor.accent}`}>
-                  {parsedSegment.type === 'regulation' ? 
-                    (parsedSegment.documentName || '규정 문서') : 
-                    'FAQ'
-                  }
+                  {getTitle()}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   구조화된 내용 보기
@@ -191,17 +250,26 @@ export const ParsedSegmentModal: React.FC<ParsedSegmentModalProps> = ({
               </div>
             </div>
           ) : (
-            parsedSegment.type === 'regulation' ? (
-              <RegulationModalContent 
-                segment={parsedSegment}
-                docColor={docColor}
-              />
-            ) : (
-              <FaqModalContent 
-                segment={parsedSegment}
-                docColor={docColor}
-              />
-            )
+            <>
+              {parsedSegment.type === 'regulation' && (
+                <RegulationModalContent 
+                  segment={parsedSegment}
+                  docColor={docColor}
+                />
+              )}
+              {parsedSegment.type === 'faq' && (
+                <FaqModalContent 
+                  segment={parsedSegment}
+                  docColor={docColor}
+                />
+              )}
+              {parsedSegment.type === 'notice' && (
+                <NoticeModalContent 
+                  segment={parsedSegment}
+                  docColor={docColor}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

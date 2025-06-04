@@ -349,7 +349,7 @@ export async function getAllDocuments(datasetIds: string[]): Promise<Array<{id: 
 export async function checkDuplicateIds(
   datasetId: string,
   documentId: string,
-  type: 'regulation' | 'faq'
+  type: 'regulation' | 'faq' | 'notice'
 ): Promise<{ 
   existingIds: string[], 
   lastId?: string,
@@ -370,6 +370,12 @@ export async function checkDuplicateIds(
         }
       } else if (type === 'faq') {
         // row_id 추출: "row_id: FAQ_025" 형태에서 "FAQ_025" 추출
+        const match = segment.content.match(/row_id:\s*([^;]+)/i)
+        if (match) {
+          existingIds.push(match[1].trim())
+        }
+      } else if (type === 'notice') {
+        // row_id 추출: "row_id: NOTICE_07" 형태에서 "NOTICE_07" 추출  
         const match = segment.content.match(/row_id:\s*([^;]+)/i)
         if (match) {
           existingIds.push(match[1].trim())
@@ -396,6 +402,21 @@ export async function checkDuplicateIds(
       const maxNumber = numericIds[0]
       lastId = `FAQ_${maxNumber.toString().padStart(3, '0')}`
       suggestedId = `FAQ_${(maxNumber + 1).toString().padStart(3, '0')}`
+    }
+  } else if (type === 'notice' && existingIds.length > 0) {
+    // NOTICE_01, NOTICE_02 형태의 ID에서 숫자 부분을 추출하여 정렬
+    const numericIds = existingIds
+      .filter(id => /^NOTICE_\d+$/i.test(id))
+      .map(id => {
+        const match = id.match(/^NOTICE_(\d+)$/i)
+        return match ? parseInt(match[1], 10) : 0
+      })
+      .sort((a, b) => b - a) // 내림차순 정렬
+    
+    if (numericIds.length > 0) {
+      const maxNumber = numericIds[0]
+      lastId = `NOTICE_${maxNumber.toString().padStart(2, '0')}`
+      suggestedId = `NOTICE_${(maxNumber + 1).toString().padStart(2, '0')}`
     }
   } else if (type === 'regulation' && existingIds.length > 0) {
     // 제1조, 제2조 형태에서 숫자 추출
@@ -428,7 +449,7 @@ export async function checkDuplicateIds(
  */
 export async function checkDuplicateIdsInAllDatasets(
   datasetIds: string[],
-  type: 'regulation' | 'faq'
+  type: 'regulation' | 'faq' | 'notice'
 ): Promise<{ 
   existingIds: string[], 
   lastId?: string,
@@ -455,6 +476,12 @@ export async function checkDuplicateIdsInAllDatasets(
               }
             } else if (type === 'faq') {
               // row_id 추출: "row_id: FAQ_025" 형태에서 "FAQ_025" 추출
+              const match = segment.content.match(/row_id:\s*([^;]+)/i)
+              if (match) {
+                allExistingIds.push(match[1].trim())
+              }
+            } else if (type === 'notice') {
+              // row_id 추출: "row_id: NOTICE_07" 형태에서 "NOTICE_07" 추출
               const match = segment.content.match(/row_id:\s*([^;]+)/i)
               if (match) {
                 allExistingIds.push(match[1].trim())
@@ -489,6 +516,21 @@ export async function checkDuplicateIdsInAllDatasets(
       const maxNumber = numericIds[0]
       lastId = `FAQ_${maxNumber.toString().padStart(3, '0')}`
       suggestedId = `FAQ_${(maxNumber + 1).toString().padStart(3, '0')}`
+    }
+  } else if (type === 'notice' && uniqueIds.length > 0) {
+    // NOTICE_01, NOTICE_02 형태의 ID에서 숫자 부분을 추출하여 정렬
+    const numericIds = uniqueIds
+      .filter(id => /^NOTICE_\d+$/i.test(id))
+      .map(id => {
+        const match = id.match(/^NOTICE_(\d+)$/i)
+        return match ? parseInt(match[1], 10) : 0
+      })
+      .sort((a, b) => b - a) // 내림차순 정렬
+    
+    if (numericIds.length > 0) {
+      const maxNumber = numericIds[0]
+      lastId = `NOTICE_${maxNumber.toString().padStart(2, '0')}`
+      suggestedId = `NOTICE_${(maxNumber + 1).toString().padStart(2, '0')}`
     }
   } else if (type === 'regulation' && uniqueIds.length > 0) {
     // 제1조, 제2조 형태에서 숫자 추출
