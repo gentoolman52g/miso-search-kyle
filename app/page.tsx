@@ -1,5 +1,5 @@
-import SearchPageClient from "@/components/search-page-client"
+import MisoKnowledgeManagerClient from "@/components/miso-knowledge-manager-client" // Updated import
 
 export default function HomePage() {
-  return <SearchPageClient />
+  return <MisoKnowledgeManagerClient /> // Updated component
 }
