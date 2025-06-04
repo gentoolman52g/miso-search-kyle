@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChatModal } from './ChatModal';
+import { ChatModal } from './chat-modal';
 import Image from 'next/image';
 
 const CHAT_URL = "https://52g.miso.gs/chatList/3ytdyMdqYeWBxKHs";

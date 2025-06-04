@@ -7,7 +7,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { MessageSquare } from "lucide-react"
-import { FloatingChatButton } from "@/domains/chat"
+import { FloatingChatButton } from "@/components/floating-chat-button"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
