@@ -4,6 +4,10 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { MessageSquare } from "lucide-react"
+import { FloatingChatButton } from "@/domains/chat"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
@@ -29,10 +33,20 @@ export default function RootLayout({
               </a>
               {/* "인사팀" text removed */}
             </div>
-            {/* Future navigation items can go here */}
+            <div className="flex flex-1 items-center justify-end space-x-2">
+              <Link href="/conversations">
+                <Button variant="outline" size="sm">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  대화 기록
+                </Button>
+              </Link>
+            </div>
           </div>
         </header>
         {children}
+        
+        {/* 플로팅 채팅 버튼 */}
+        <FloatingChatButton />
       </body>
     </html>
   )
