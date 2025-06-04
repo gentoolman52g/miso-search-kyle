@@ -57,11 +57,11 @@ async function fetchFromKnowledgeApi<T>(path: string, options: RequestInit = {})
 
 /**
  * Fetches all documents within a given dataset.
- * Path should be /ext/v1/datasets/{datasetId}/docs
+ * Path should be /datasets/{datasetId}/docs
  */
 async function getDocumentsInDataset(datasetId: string): Promise<MisoKnowledgeDocListItem[]> {
-  // Corrected path to include /ext/v1/
-  const path = `/ext/v1/datasets/${datasetId}/docs`
+  // Remove /ext/v1/ from path since it's already in KNOWLEDGE_API_ENDPOINT
+  const path = `/datasets/${datasetId}/docs`
   console.log(`Constructed path for getDocumentsInDataset: ${path}`)
   const response = await fetchFromKnowledgeApi<MisoKnowledgeDocListResponse>(path)
   return response.data || []
@@ -69,11 +69,11 @@ async function getDocumentsInDataset(datasetId: string): Promise<MisoKnowledgeDo
 
 /**
  * Fetches all segments for a given document within a dataset.
- * Path should be /ext/v1/datasets/{datasetId}/docs/{documentId}/segments
+ * Path should be /datasets/{datasetId}/docs/{documentId}/segments
  */
 async function getSegmentsInDocument(datasetId: string, documentId: string): Promise<MisoKnowledgeSegmentDetail[]> {
-  // Path is already correct here as it includes /ext/v1/
-  const path = `/ext/v1/datasets/${datasetId}/docs/${documentId}/segments`
+  // Remove /ext/v1/ from path since it's already in KNOWLEDGE_API_ENDPOINT
+  const path = `/datasets/${datasetId}/docs/${documentId}/segments`
   console.log(`Constructed path for getSegmentsInDocument: ${path}`)
   const response = await fetchFromKnowledgeApi<MisoKnowledgeDocSegmentsResponse>(path)
   return response.data || []
