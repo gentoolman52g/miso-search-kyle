@@ -1,7 +1,7 @@
 "use server"
 
 import { runMisoWorkflow } from "@/lib/miso/workflow-client"
-import { fetchSegmentDetails, fetchRandomSegments, addSegmentToDocument, getDatasetList, getDocumentList, checkDuplicateIds, getAllDocuments, checkDuplicateIdsInAllDatasets } from "@/lib/miso/knowledge-client"
+import { fetchSegmentDetails, fetchRandomSegments, addSegmentToDocument, getDatasetList, getDocumentList, checkDuplicateIds, getAllDocuments, checkDuplicateIdsInAllDatasets, updateSegmentInDocument } from "@/lib/miso/knowledge-client"
 import type { KnowledgeSegment } from "@/lib/miso/types"
 
 const MISO_KNOWLEDGE_DATASET_IDS_STRING = process.env.MISO_KNOWLEDGE_DATASET_IDS
@@ -130,6 +130,29 @@ export async function addKnowledgeSegment(
   } catch (error: any) {
     console.error('Error adding knowledge segment:', error)
     let userErrorMessage = "세그먼트 추가 중 문제가 발생했습니다."
+    if (error.message.includes("Knowledge API is not configured")) {
+      userErrorMessage = "API 서비스가 올바르게 구성되지 않았습니다. 지원팀에 문의하세요."
+    } else if (error.message.includes("API request failed")) {
+      userErrorMessage = "MISO API 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
+    }
+    return { error: userErrorMessage }
+  }
+}
+
+export async function updateKnowledgeSegment(
+  datasetId: string, 
+  documentId: string,
+  segmentId: string,
+  content: string, 
+  answer?: string, 
+  keywords?: string[]
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const result = await updateSegmentInDocument(datasetId, documentId, segmentId, content, answer, keywords)
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error updating knowledge segment:', error)
+    let userErrorMessage = "세그먼트 수정 중 문제가 발생했습니다."
     if (error.message.includes("Knowledge API is not configured")) {
       userErrorMessage = "API 서비스가 올바르게 구성되지 않았습니다. 지원팀에 문의하세요."
     } else if (error.message.includes("API request failed")) {

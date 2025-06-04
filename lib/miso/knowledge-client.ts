@@ -221,6 +221,37 @@ export async function addSegmentToDocument(
 }
 
 /**
+ * 문서의 세그먼트를 수정합니다
+ */
+export async function updateSegmentInDocument(
+  datasetId: string,
+  documentId: string,
+  segmentId: string,
+  content: string,
+  answer?: string,
+  keywords?: string[]
+): Promise<any> {
+  const path = `/datasets/${datasetId}/docs/${documentId}/segments/${segmentId}`
+  
+  const requestBody = {
+    segment: {
+      content,
+      answer: answer || "",
+      keywords: keywords || [],
+      enabled: true
+    }
+  }
+  
+  console.log(`Updating segment ${segmentId} in document ${documentId} of dataset ${datasetId}`)
+  const response = await fetchFromKnowledgeApi(path, {
+    method: 'PUT',
+    body: JSON.stringify(requestBody)
+  })
+  
+  return response
+}
+
+/**
  * 환경변수에 설정된 데이터셋 목록을 가져옵니다
  */
 export async function getDatasetList(datasetIds: string[]): Promise<Array<{id: string, name: string}>> {

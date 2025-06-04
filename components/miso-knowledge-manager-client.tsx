@@ -3,18 +3,20 @@
 import type React from "react"
 
 import { useState, useEffect, useTransition, useCallback, useMemo, useRef } from "react"
-import { Search, ArrowRight, Loader2, AlertTriangle, FileText, BookOpen, X, ExternalLink, Sparkles, Plus, Filter } from "lucide-react"
+import { Search, ArrowRight, Loader2, AlertTriangle, FileText, BookOpen, X, ExternalLink, Sparkles, Plus, Filter, Edit, MoreVertical } from "lucide-react"
 import { searchMisoKnowledge, fetchInitialKnowledgeData, fetchAllDocuments, fetchSegmentsByDocument } from "@/app/miso-actions"
 import type { KnowledgeSegment } from "@/lib/miso/types"
 import { parseSegmentContent, type ParsedSegment } from "@/lib/segment-parser"
 import { ParsedSegmentCard } from "@/components/parsed-segment-card"
 import { ParsedSegmentModal } from "@/components/parsed-segment-modal"
-import { AddSegmentModal } from "@/components/add-segment-modal"
+import { SegmentModal, type EditSegmentData } from "@/components/add-segment-modal"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Image from "next/image"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 
 // 모달 컴포넌트
 const Modal = ({ 
@@ -198,7 +200,15 @@ interface DocumentInfo {
   datasetName: string
 }
 
-const SearchResults = ({ results, error }: { results: KnowledgeSegment[]; error: string | null }) => {
+const SearchResults = ({ 
+  results, 
+  error, 
+  onEditSegment 
+}: { 
+  results: KnowledgeSegment[]
+  error: string | null
+  onEditSegment: (segment: KnowledgeSegment) => void
+}) => {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [selectedSegment, setSelectedSegment] = useState<KnowledgeSegment | null>(null)
   const [selectedParsedSegment, setSelectedParsedSegment] = useState<ParsedSegment | null>(null)
@@ -322,11 +332,14 @@ const SearchResults = ({ results, error }: { results: KnowledgeSegment[]; error:
                     parsedSegment={parsedSegment}
                     isHovered={isHovered}
                     docColor={docColor}
+                    onClick={() => openModal(segment)}
+                    onEditSegment={onEditSegment}
+                    originalSegment={segment}
                   />
                 ) : (
                   <Card
                     className={`
-                      h-64 overflow-hidden cursor-pointer
+                      h-64 overflow-hidden cursor-pointer relative
                       transition-all duration-300 ease-out
                       ${docColor.bg}
                       ${isHovered 
@@ -337,7 +350,24 @@ const SearchResults = ({ results, error }: { results: KnowledgeSegment[]; error:
                       group
                     `}
                   >
-                    <CardHeader className="pb-3">
+                    {/* 편집 버튼 */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onEditSegment(segment)
+                      }}
+                      className={`
+                        absolute top-2 right-2 z-10 p-1.5 rounded-lg
+                        bg-white/80 hover:bg-white border border-gray-200
+                        opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                        hover:shadow-md
+                      `}
+                      title="세그먼트 수정"
+                    >
+                      <Edit className="h-3.5 w-3.5 text-gray-600" />
+                    </button>
+
+                    <CardHeader className="pb-3" onClick={() => openModal(segment)}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           {segment.documentName && (
@@ -355,7 +385,7 @@ const SearchResults = ({ results, error }: { results: KnowledgeSegment[]; error:
                       </div>
                     </CardHeader>
                     
-                    <CardContent className="pt-0 h-[calc(100%-80px)] flex flex-col">
+                    <CardContent className="pt-0 h-[calc(100%-80px)] flex flex-col" onClick={() => openModal(segment)}>
                       {segment.content && (
                         <div className={`
                           text-sm leading-relaxed transition-colors duration-200 flex-1
@@ -418,6 +448,7 @@ const InitialKnowledge = ({
   hasMore,
   isLoadingMore,
   onAddSegment,
+  onEditSegment,
   selectedDocumentId,
   onDocumentChange,
   documents,
@@ -431,6 +462,7 @@ const InitialKnowledge = ({
   hasMore: boolean
   isLoadingMore: boolean
   onAddSegment: () => void
+  onEditSegment: (segment: KnowledgeSegment) => void
   selectedDocumentId: string
   onDocumentChange: (documentId: string) => void
   documents: DocumentInfo[]
@@ -743,11 +775,14 @@ const InitialKnowledge = ({
                     parsedSegment={parsedSegment}
                     isHovered={isHovered}
                     docColor={docColor}
+                    onClick={() => openModal(segment)}
+                    onEditSegment={onEditSegment}
+                    originalSegment={segment}
                   />
                 ) : (
                   <Card
                     className={`
-                      h-64 overflow-hidden cursor-pointer
+                      h-64 overflow-hidden cursor-pointer relative
                       transition-all duration-300 ease-out
                       ${docColor.bg}
                       ${isHovered 
@@ -758,7 +793,24 @@ const InitialKnowledge = ({
                       group
                     `}
                   >
-                    <CardHeader className="pb-3">
+                    {/* 편집 버튼 */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onEditSegment(segment)
+                      }}
+                      className={`
+                        absolute top-2 right-2 z-10 p-1.5 rounded-lg
+                        bg-white/80 hover:bg-white border border-gray-200
+                        opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                        hover:shadow-md
+                      `}
+                      title="세그먼트 수정"
+                    >
+                      <Edit className="h-3.5 w-3.5 text-gray-600" />
+                    </button>
+
+                    <CardHeader className="pb-3" onClick={() => openModal(segment)}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           {segment.documentName && (
@@ -776,7 +828,7 @@ const InitialKnowledge = ({
                       </div>
                     </CardHeader>
                     
-                    <CardContent className="pt-0 h-[calc(100%-80px)] flex flex-col">
+                    <CardContent className="pt-0 h-[calc(100%-80px)] flex flex-col" onClick={() => openModal(segment)}>
                       {segment.content && (
                         <div className={`
                           text-sm leading-relaxed transition-colors duration-200 flex-1
@@ -865,6 +917,10 @@ export default function MisoKnowledgeManagerClient() {
 
   // 추가하기 모달 상태
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+
+  // 편집 모달 상태
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editSegmentData, setEditSegmentData] = useState<EditSegmentData | undefined>(undefined)
 
   // 문서 필터링 상태
   const [documents, setDocuments] = useState<DocumentInfo[]>([])
@@ -1070,6 +1126,38 @@ export default function MisoKnowledgeManagerClient() {
     }
   }, [selectedDocumentId, handleDocumentChange])
 
+  // 편집 세그먼트 핸들러
+  const handleEditSegment = useCallback((segment: KnowledgeSegment) => {
+    if (!segment.documentId) {
+      console.error('No document ID found for segment')
+      return
+    }
+
+    // 세그먼트가 속한 문서의 데이터셋 ID 찾기
+    const document = documents.find(doc => doc.id === segment.documentId)
+    if (!document) {
+      console.error('Document not found for segment')
+      return
+    }
+
+    setEditSegmentData({
+      id: segment.id,
+      documentId: segment.documentId,
+      datasetId: document.datasetId,
+      content: segment.content || '',
+      answer: segment.answer,
+      keywords: segment.keywords
+    })
+    setIsEditModalOpen(true)
+  }, [documents])
+
+  // 편집 성공 핸들러 (추가와 동일한 로직 사용)
+  const handleEditSegmentSuccess = useCallback(async () => {
+    setIsEditModalOpen(false)
+    setEditSegmentData(undefined)
+    await handleAddSegmentSuccess() // 동일한 새로고침 로직 사용
+  }, [handleAddSegmentSuccess])
+
   return (
     <main className="flex flex-col items-center justify-start min-h-screen pt-16 pb-24 px-6 bg-gradient-to-br from-background via-background to-muted/20 selection:bg-accent/30 selection:text-accent-foreground">
       <div className="w-full max-w-3xl space-y-12 text-center">
@@ -1090,7 +1178,7 @@ export default function MisoKnowledgeManagerClient() {
         </div>
       )}
       
-      {hasSearched && !isPending && <SearchResults results={searchResults} error={searchError} />}
+      {hasSearched && !isPending && <SearchResults results={searchResults} error={searchError} onEditSegment={handleEditSegment} />}
       
       {/* 검색하지 않았을 때만 초기 지식 데이터 표시 */}
       {!hasSearched && !isPending && (
@@ -1103,6 +1191,7 @@ export default function MisoKnowledgeManagerClient() {
           hasMore={hasMoreData}
           isLoadingMore={isLoadingMore}
           onAddSegment={() => setIsAddModalOpen(true)}
+          onEditSegment={handleEditSegment}
           selectedDocumentId={selectedDocumentId}
           onDocumentChange={handleDocumentChange}
           documents={documents}
@@ -1111,10 +1200,21 @@ export default function MisoKnowledgeManagerClient() {
       )}
 
       {/* 추가하기 모달 */}
-      <AddSegmentModal
+      <SegmentModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={handleAddSegmentSuccess}
+      />
+
+      {/* 편집 모달 */}
+      <SegmentModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setEditSegmentData(undefined)
+        }}
+        onSuccess={handleEditSegmentSuccess}
+        editSegment={editSegmentData}
       />
 
       <footer className="fixed bottom-0 left-0 right-0 h-12 flex items-center justify-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border/20">

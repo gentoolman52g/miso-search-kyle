@@ -8,13 +8,24 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { X, Plus, FileText, HelpCircle, File, Loader2, AlertTriangle, CheckCircle, ChevronRight, Info } from 'lucide-react'
-import { addKnowledgeSegment, fetchAllDocuments, checkSegmentDuplicates } from '@/app/miso-actions'
+import { X, Plus, FileText, HelpCircle, File, Loader2, AlertTriangle, CheckCircle, ChevronRight, Info, Edit } from 'lucide-react'
+import { addKnowledgeSegment, updateKnowledgeSegment, fetchAllDocuments, checkSegmentDuplicates } from '@/app/miso-actions'
 
-interface AddSegmentModalProps {
+// 편집할 세그먼트 정보 타입
+export interface EditSegmentData {
+  id: string
+  documentId: string
+  datasetId: string
+  content: string
+  answer?: string
+  keywords?: string[]
+}
+
+interface SegmentModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  editSegment?: EditSegmentData // 편집할 세그먼트 데이터 (없으면 추가 모드)
 }
 
 type SegmentType = 'regulation' | 'faq'
@@ -48,11 +59,86 @@ interface DuplicateCheckResult {
   suggestedId?: string
 }
 
-export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
+// 세그먼트 내용 파싱 함수들
+const parseRegulationSegment = (content: string): RegulationData => {
+  const regulation: RegulationData = {
+    documentName: '',
+    chapterNumber: '',
+    chapterTitle: '',
+    articleNumber: '',
+    articleTitle: '',
+    content: ''
+  }
+
+  const parts = content.split(';')
+  for (const part of parts) {
+    const [key, value] = part.split(':').map(s => s.trim())
+    if (!key || !value) continue
+
+    switch (key) {
+      case '문서명':
+        regulation.documentName = value
+        break
+      case '장번호':
+        regulation.chapterNumber = value
+        break
+      case '장제목':
+        regulation.chapterTitle = value
+        break
+      case '조번호':
+        regulation.articleNumber = value
+        break
+      case '조제목':
+        regulation.articleTitle = value
+        break
+      case '내용':
+        regulation.content = value
+        break
+    }
+  }
+
+  return regulation
+}
+
+const parseFaqSegment = (content: string): FaqData => {
+  const faq: FaqData = {
+    rowId: '',
+    topic: '',
+    question: '',
+    answer: ''
+  }
+
+  const parts = content.split(';')
+  for (const part of parts) {
+    const [key, value] = part.split(':').map(s => s.trim())
+    if (!key || !value) continue
+
+    switch (key) {
+      case 'row_id':
+        faq.rowId = value
+        break
+      case '주제':
+        faq.topic = value
+        break
+      case '질문':
+        faq.question = value
+        break
+      case '답변':
+        faq.answer = value
+        break
+    }
+  }
+
+  return faq
+}
+
+export const SegmentModal: React.FC<SegmentModalProps> = ({
   isOpen,
   onClose,
-  onSuccess
+  onSuccess,
+  editSegment
 }) => {
+  const isEditMode = !!editSegment
   const [segmentType, setSegmentType] = useState<SegmentType>('regulation')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -83,38 +169,74 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
     answer: ''
   })
 
+  // 편집 모드에서 기존 데이터로 폼 초기화
+  const initializeEditData = useCallback(() => {
+    if (!editSegment) return
+
+    // 세그먼트 타입 결정 (content 분석)
+    const content = editSegment.content
+    const isRegulation = content.includes('조번호:')
+    const isFaq = content.includes('row_id:')
+    
+    if (isRegulation) {
+      setSegmentType('regulation')
+      const parsedData = parseRegulationSegment(content)
+      setRegulationData(parsedData)
+    } else if (isFaq) {
+      setSegmentType('faq')
+      const parsedData = parseFaqSegment(content)
+      // editSegment.answer 사용
+      if (editSegment.answer) {
+        parsedData.answer = editSegment.answer
+      }
+      setFaqData(parsedData)
+    }
+
+    // 문서 ID 설정
+    setSelectedDocumentId(editSegment.documentId)
+  }, [editSegment])
+
   // 초기화 함수
   const resetAllStates = useCallback(() => {
     setSegmentType('regulation')
     setIsSubmitting(false)
     setError(null)
-    setSelectedDocumentId('')
+    if (!isEditMode) {
+      setSelectedDocumentId('')
+    }
     setDuplicateCheckResult(null)
     setIsCheckingDuplicate(false)
     setDuplicateWarning(null)
-    setRegulationData({
-      documentName: '',
-      chapterNumber: '',
-      chapterTitle: '',
-      articleNumber: '',
-      articleTitle: '',
-      content: ''
-    })
-    setFaqData({
-      rowId: '',
-      topic: '',
-      question: '',
-      answer: ''
-    })
-  }, [])
+    if (!isEditMode) {
+      setRegulationData({
+        documentName: '',
+        chapterNumber: '',
+        chapterTitle: '',
+        articleNumber: '',
+        articleTitle: '',
+        content: ''
+      })
+      setFaqData({
+        rowId: '',
+        topic: '',
+        question: '',
+        answer: ''
+      })
+    }
+  }, [isEditMode])
 
   // 모달이 열릴 때 초기화 및 데이터 로드
   useEffect(() => {
     if (isOpen) {
       resetAllStates()
       loadAllDocuments()
+      
+      // 편집 모드인 경우 기존 데이터로 초기화
+      if (isEditMode && editSegment) {
+        initializeEditData()
+      }
     }
-  }, [isOpen, resetAllStates])
+  }, [isOpen, resetAllStates, isEditMode, initializeEditData])
 
   // 모달이 닫힐 때 초기화
   const handleClose = useCallback(() => {
@@ -122,27 +244,27 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
     onClose()
   }, [resetAllStates, onClose])
 
-  // 문서 선택 및 타입 변경 시 중복검사 (문서가 선택된 경우에만)
+  // 문서 선택 및 타입 변경 시 중복검사 (문서가 선택된 경우에만, 편집 모드가 아닐 때만)
   useEffect(() => {
-    if (isOpen && selectedDocumentId && documents.length > 0) {
+    if (isOpen && selectedDocumentId && documents.length > 0 && !isEditMode) {
       checkDuplicates()
-    } else {
+    } else if (!isEditMode) {
       // 문서가 선택되지 않은 경우 중복검사 결과 초기화
       setDuplicateCheckResult(null)
       setDuplicateWarning(null)
     }
-  }, [segmentType, selectedDocumentId, isOpen, documents.length])
+  }, [segmentType, selectedDocumentId, isOpen, documents.length, isEditMode])
 
-  // ID 자동 제안 적용 (사용자가 수동으로 변경하지 않은 경우에만)
+  // ID 자동 제안 적용 (사용자가 수동으로 변경하지 않은 경우에만, 편집 모드가 아닐 때만)
   useEffect(() => {
-    if (duplicateCheckResult?.suggestedId) {
+    if (duplicateCheckResult?.suggestedId && !isEditMode) {
       if (segmentType === 'faq' && !faqData.rowId) {
         setFaqData(prev => ({ ...prev, rowId: duplicateCheckResult.suggestedId || '' }))
       } else if (segmentType === 'regulation' && !regulationData.articleNumber) {
         setRegulationData(prev => ({ ...prev, articleNumber: duplicateCheckResult.suggestedId || '' }))
       }
     }
-  }, [duplicateCheckResult, segmentType, faqData.rowId, regulationData.articleNumber])
+  }, [duplicateCheckResult, segmentType, faqData.rowId, regulationData.articleNumber, isEditMode])
 
   const loadAllDocuments = async () => {
     setIsLoadingDocuments(true)
@@ -189,11 +311,31 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
 
   const checkCurrentIdDuplicate = (currentId: string): boolean => {
     if (!duplicateCheckResult || !currentId.trim()) return false
+    // 편집 모드에서는 현재 세그먼트 자신의 ID는 중복으로 간주하지 않음
+    if (isEditMode) {
+      const existingSegmentId = getCurrentIdFromEditSegment()
+      if (existingSegmentId === currentId.trim()) {
+        return false
+      }
+    }
     return duplicateCheckResult.existingIds.includes(currentId.trim())
   }
 
   const getCurrentId = (): string => {
     return segmentType === 'faq' ? faqData.rowId : regulationData.articleNumber
+  }
+
+  const getCurrentIdFromEditSegment = (): string => {
+    if (!editSegment) return ''
+    
+    const content = editSegment.content
+    if (segmentType === 'faq') {
+      const match = content.match(/row_id:\s*([^;]+)/i)
+      return match ? match[1].trim() : ''
+    } else {
+      const match = content.match(/조번호:\s*([^;]+)/i)
+      return match ? match[1].trim() : ''
+    }
   }
 
   const getSelectedDocument = (): Document | undefined => {
@@ -203,7 +345,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
   // ID 중복검사 및 경고 메시지 업데이트
   useEffect(() => {
     const currentId = getCurrentId()
-    if (currentId && duplicateCheckResult) {
+    if (currentId && duplicateCheckResult && !isEditMode) {
       if (checkCurrentIdDuplicate(currentId)) {
         const lastIdInfo = duplicateCheckResult.lastId 
           ? ` 현재 마지막 ${segmentType === 'faq' ? 'Row ID' : '조번호'}는 ${duplicateCheckResult.lastId}입니다.`
@@ -215,7 +357,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
     } else {
       setDuplicateWarning(null)
     }
-  }, [faqData.rowId, regulationData.articleNumber, duplicateCheckResult, segmentType])
+  }, [faqData.rowId, regulationData.articleNumber, duplicateCheckResult, segmentType, isEditMode])
 
   if (!isOpen) return null
 
@@ -244,11 +386,13 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
     setIsSubmitting(true)
 
     try {
-      // 중복검사
-      const currentId = getCurrentId()
-      if (currentId && checkCurrentIdDuplicate(currentId)) {
-        setError(`중복된 ${segmentType === 'faq' ? 'Row ID' : '조번호'}입니다. 다른 ID를 사용해주세요.`)
-        return
+      // 편집 모드가 아닐 때만 중복검사
+      if (!isEditMode) {
+        const currentId = getCurrentId()
+        if (currentId && checkCurrentIdDuplicate(currentId)) {
+          setError(`중복된 ${segmentType === 'faq' ? 'Row ID' : '조번호'}입니다. 다른 ID를 사용해주세요.`)
+          return
+        }
       }
 
       const originalContent = convertToOriginalFormat()
@@ -264,13 +408,27 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
         return
       }
       
-      const result = await addKnowledgeSegment(
-        selectedDocument.datasetId,
-        selectedDocument.id,
-        originalContent,
-        segmentType === 'faq' ? faqData.answer : undefined,
-        []
-      )
+      let result
+      if (isEditMode && editSegment) {
+        // 편집 모드
+        result = await updateKnowledgeSegment(
+          editSegment.datasetId,
+          editSegment.documentId,
+          editSegment.id,
+          originalContent,
+          segmentType === 'faq' ? faqData.answer : undefined,
+          []
+        )
+      } else {
+        // 추가 모드
+        result = await addKnowledgeSegment(
+          selectedDocument.datasetId,
+          selectedDocument.id,
+          originalContent,
+          segmentType === 'faq' ? faqData.answer : undefined,
+          []
+        )
+      }
 
       if (result.error) {
         setError(result.error)
@@ -279,7 +437,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
         handleClose()
       }
     } catch (error) {
-      setError('세그먼트 추가 중 오류가 발생했습니다.')
+      setError(`세그먼트 ${isEditMode ? '수정' : '추가'} 중 오류가 발생했습니다.`)
     } finally {
       setIsSubmitting(false)
     }
@@ -293,7 +451,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
         faqData.question.trim() !== '' && 
         faqData.answer.trim() !== ''
         
-    const noDuplicates = !checkCurrentIdDuplicate(getCurrentId())
+    const noDuplicates = isEditMode || !checkCurrentIdDuplicate(getCurrentId())
         
     return hasValidContent && selectedDocumentId && noDuplicates
   }
@@ -313,12 +471,17 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
           <div className="pr-12">
             <div className="flex items-center gap-3 mb-2">
               <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
-                <Plus className="w-5 h-5 text-blue-600" />
+                {isEditMode ? <Edit className="w-5 h-5 text-blue-600" /> : <Plus className="w-5 h-5 text-blue-600" />}
               </div>
-              <h1 className="text-xl font-bold text-gray-900">새 세그먼트 추가</h1>
+              <h1 className="text-xl font-bold text-gray-900">
+                {isEditMode ? '세그먼트 수정' : '새 세그먼트 추가'}
+              </h1>
             </div>
             <p className="text-sm text-gray-600 leading-relaxed">
-              지식베이스에 새로운 내용을 추가하세요. 필요한 정보를 단계별로 입력해드릴게요.
+              {isEditMode 
+                ? '기존 세그먼트의 내용을 수정하세요.' 
+                : '지식베이스에 새로운 내용을 추가하세요. 필요한 정보를 단계별로 입력해드릴게요.'
+              }
             </p>
           </div>
         </div>
@@ -327,7 +490,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
         <div className="px-6 py-6 overflow-y-auto flex-1">
           <div className="space-y-8">
             
-            {/* 1단계: 타입 선택 */}
+            {/* 1단계: 타입 선택 (편집 모드에서는 비활성화) */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="flex items-center justify-center w-6 h-6 bg-blue-600 text-white text-xs font-bold rounded-full">1</div>
@@ -336,12 +499,13 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
               
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => setSegmentType('regulation')}
+                  onClick={() => !isEditMode && setSegmentType('regulation')}
+                  disabled={isEditMode}
                   className={`p-4 rounded-xl border-2 transition-all text-left ${
                     segmentType === 'regulation' 
                       ? 'border-blue-500 bg-blue-50' 
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                  } ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className="flex items-center gap-3">
                     <FileText className={`w-5 h-5 ${segmentType === 'regulation' ? 'text-blue-600' : 'text-gray-400'}`} />
@@ -355,12 +519,13 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                 </button>
                 
                 <button
-                  onClick={() => setSegmentType('faq')}
+                  onClick={() => !isEditMode && setSegmentType('faq')}
+                  disabled={isEditMode}
                   className={`p-4 rounded-xl border-2 transition-all text-left ${
                     segmentType === 'faq' 
                       ? 'border-blue-500 bg-blue-50' 
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                  } ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className="flex items-center gap-3">
                     <HelpCircle className={`w-5 h-5 ${segmentType === 'faq' ? 'text-blue-600' : 'text-gray-400'}`} />
@@ -377,43 +542,63 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
 
             <Separator />
 
-            {/* 2단계: 문서 선택 */}
+            {/* 2단계: 문서 선택 (편집 모드에서는 표시만) */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="flex items-center justify-center w-6 h-6 bg-blue-600 text-white text-xs font-bold rounded-full">2</div>
-                <h2 className="text-lg font-semibold text-gray-900">어떤 문서에 추가할까요?</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {isEditMode ? '문서 정보' : '어떤 문서에 추가할까요?'}
+                </h2>
               </div>
               
               <div className="space-y-3">
-                <Label className="text-sm font-medium text-gray-700">대상 문서를 선택해주세요</Label>
-                <Select 
-                  value={selectedDocumentId} 
-                  onValueChange={setSelectedDocumentId}
-                  disabled={isLoadingDocuments}
-                >
-                  <SelectTrigger className="w-full h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                <Label className="text-sm font-medium text-gray-700">
+                  {isEditMode ? '선택된 문서' : '대상 문서를 선택해주세요'}
+                </Label>
+                {isEditMode ? (
+                  <div className="w-full h-12 border border-gray-200 rounded-lg px-3 flex items-center bg-gray-50">
                     <div className="flex items-center gap-3 text-left">
                       <File className="w-4 h-4 text-gray-400" />
-                      <SelectValue 
-                        placeholder={isLoadingDocuments ? "문서 목록을 불러오는 중..." : "문서를 선택하세요"} 
-                      />
+                      <div className="flex flex-col">
+                        <span className="font-medium text-gray-900">
+                          {documents.find(doc => doc.id === selectedDocumentId)?.name || '문서 로딩 중...'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {documents.find(doc => doc.id === selectedDocumentId)?.datasetName || ''}
+                        </span>
+                      </div>
                     </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {documents.map((document) => (
-                      <SelectItem key={document.id} value={document.id} className="py-3">
-                        <div className="flex flex-col gap-1">
-                          <div className="font-medium text-gray-900">{document.name}</div>
-                          <div className="text-xs text-gray-500">{document.datasetName}</div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                ) : (
+                  <Select 
+                    value={selectedDocumentId} 
+                    onValueChange={setSelectedDocumentId}
+                    disabled={isLoadingDocuments}
+                  >
+                    <SelectTrigger className="w-full h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                      <div className="flex items-center gap-3 text-left">
+                        <File className="w-4 h-4 text-gray-400" />
+                        <SelectValue 
+                          placeholder={isLoadingDocuments ? "문서 목록을 불러오는 중..." : "문서를 선택하세요"} 
+                        />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {documents.map((document) => (
+                        <SelectItem key={document.id} value={document.id} className="py-3">
+                          <div className="flex flex-col gap-1">
+                            <div className="font-medium text-gray-900">{document.name}</div>
+                            <div className="text-xs text-gray-500">{document.datasetName}</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               {/* 중복검사 로딩 */}
-              {isCheckingDuplicate && selectedDocumentId && (
+              {isCheckingDuplicate && selectedDocumentId && !isEditMode && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center gap-3">
                     <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
@@ -423,7 +608,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
               )}
 
               {/* 중복검사 결과 */}
-              {duplicateCheckResult && selectedDocumentId && !isCheckingDuplicate && (
+              {duplicateCheckResult && selectedDocumentId && !isCheckingDuplicate && !isEditMode && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
@@ -502,7 +687,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                         onChange={(e) => setRegulationData(prev => ({ ...prev, articleNumber: e.target.value }))}
                         placeholder="예: 제62조"
                         className={`h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500 ${
-                          checkCurrentIdDuplicate(regulationData.articleNumber) ? 'border-amber-400 bg-amber-50' : ''
+                          !isEditMode && checkCurrentIdDuplicate(regulationData.articleNumber) ? 'border-amber-400 bg-amber-50' : ''
                         }`}
                       />
                     </div>
@@ -541,7 +726,7 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
                         onChange={(e) => setFaqData(prev => ({ ...prev, rowId: e.target.value }))}
                         placeholder="예: FAQ_025"
                         className={`h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500 ${
-                          checkCurrentIdDuplicate(faqData.rowId) ? 'border-amber-400 bg-amber-50' : ''
+                          !isEditMode && checkCurrentIdDuplicate(faqData.rowId) ? 'border-amber-400 bg-amber-50' : ''
                         }`}
                         required
                       />
@@ -633,11 +818,11 @@ export const AddSegmentModal: React.FC<AddSegmentModalProps> = ({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  추가하는 중...
+                  {isEditMode ? '수정하는 중...' : '추가하는 중...'}
                 </>
               ) : (
                 <>
-                  추가하기
+                  {isEditMode ? '수정하기' : '추가하기'}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </>
               )}

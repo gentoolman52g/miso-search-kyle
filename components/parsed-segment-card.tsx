@@ -3,8 +3,9 @@
 import React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { BookOpen, Hash } from 'lucide-react'
+import { BookOpen, Hash, Edit } from 'lucide-react'
 import { ParsedSegment, ParsedRegulationSegment, ParsedFaqSegment } from '@/lib/segment-parser'
+import { KnowledgeSegment } from '@/lib/miso/types'
 
 interface ParsedSegmentCardProps {
   parsedSegment: ParsedSegment
@@ -15,6 +16,8 @@ interface ParsedSegmentCardProps {
     accent: string
   }
   onClick?: () => void
+  onEditSegment?: (segment: KnowledgeSegment) => void
+  originalSegment?: KnowledgeSegment
 }
 
 const RegulationSegmentContent = ({ 
@@ -135,12 +138,14 @@ export const ParsedSegmentCard: React.FC<ParsedSegmentCardProps> = ({
   parsedSegment,
   isHovered = false,
   docColor,
-  onClick
+  onClick,
+  onEditSegment,
+  originalSegment
 }) => {
   return (
     <Card
       className={`
-        h-64 overflow-hidden cursor-pointer
+        h-64 overflow-hidden cursor-pointer relative
         transition-all duration-300 ease-out
         ${docColor.bg}
         ${isHovered 
@@ -150,21 +155,41 @@ export const ParsedSegmentCard: React.FC<ParsedSegmentCardProps> = ({
         rounded-2xl
         group
       `}
-      onClick={onClick}
     >
-      {parsedSegment.type === 'regulation' ? (
-        <RegulationSegmentContent 
-          segment={parsedSegment}
-          isHovered={isHovered}
-          docColor={docColor}
-        />
-      ) : (
-        <FaqSegmentContent 
-          segment={parsedSegment}
-          isHovered={isHovered}
-          docColor={docColor}
-        />
+      {/* 편집 버튼 */}
+      {onEditSegment && originalSegment && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onEditSegment(originalSegment)
+          }}
+          className={`
+            absolute top-2 right-2 z-10 p-1.5 rounded-lg
+            bg-white/80 hover:bg-white border border-gray-200
+            opacity-0 group-hover:opacity-100 transition-opacity duration-200
+            hover:shadow-md
+          `}
+          title="세그먼트 수정"
+        >
+          <Edit className="h-3.5 w-3.5 text-gray-600" />
+        </button>
       )}
+
+      <div onClick={onClick}>
+        {parsedSegment.type === 'regulation' ? (
+          <RegulationSegmentContent 
+            segment={parsedSegment}
+            isHovered={isHovered}
+            docColor={docColor}
+          />
+        ) : (
+          <FaqSegmentContent 
+            segment={parsedSegment}
+            isHovered={isHovered}
+            docColor={docColor}
+          />
+        )}
+      </div>
     </Card>
   )
 } 
