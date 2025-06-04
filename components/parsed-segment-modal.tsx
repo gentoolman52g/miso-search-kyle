@@ -275,4 +275,4 @@ export const ParsedSegmentModal: React.FC<ParsedSegmentModalProps> = ({
       </div>
     </div>
   )
-} 
+}

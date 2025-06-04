@@ -104,4 +104,4 @@ export function ChatModal({ isOpen, onClose, chatUrl }: ChatModalProps) {
       </DialogContent>
     </Dialog>
   );
-} 
+}

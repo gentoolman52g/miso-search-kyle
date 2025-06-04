@@ -262,4 +262,4 @@ export const ParsedSegmentCard: React.FC<ParsedSegmentCardProps> = ({
       </div>
     </Card>
   )
-} 
+}
