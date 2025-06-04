@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%; /* #0A0A0A, slightly darker than #1A1A1A for more depth */
+    --foreground: 0 0% 98%; /* #FAFAFA */
+
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+
+    --secondary: 240 3.7% 15.9%; /* #2D2D2D - Search bar background */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 160 60% 65%; /* #76D7C4 - Mint for focus/accent */
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%; /* Matches border for seamless look */
+    --ring: 160 60% 65%; /* Mint for focus ring */
+
+    --radius: 0.5rem;
+  }
+
+  .light {
+    --background: 220 20% 96.1%; /* #F0F2F5 - Adjusted HSL for #F0F2F5 */
+    --foreground: 0 0% 20%; /* #333333 */
+
+    --card: 0 0% 100%; /* #FFFFFF - For Search Bar background */
+    --card-foreground: 0 0% 20%; /* #333333 */
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+
+    --primary: 0 0% 20%; /* #333333 */
+    --primary-foreground: 0 0% 98%; /* #FAFAFA */
+
+    --secondary: 0 0% 93.1%; /* #EDEDED - For Suggestion Chips background */
+    --secondary-foreground: 0 0% 20%; /* #333333 for text on chips */
+
+    --muted: 0 0% 93.1%;
+    --muted-foreground: 0 0% 45%; /* #737373 for placeholder text */
+
+    --accent: 210 100% 50%; /* #007AFF - Vivid Blue for focus/accent */
+    --accent-foreground: 0 0% 98%; /* White text on accent */
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 87%; /* #DFDFDF */
+    --input: 0 0% 87%;
+    --ring: 210 100% 50%; /* Vivid Blue for focus ring */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom animation for initial load */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+.animate-scale-in {
+  animation: scaleIn 0.5s ease-out forwards;
+}
+
+/* Delay utilities */
+.animation-delay-100 {
+  animation-delay: 0.1s;
+}
+.animation-delay-200 {
+  animation-delay: 0.2s;
+}
+.animation-delay-300 {
+  animation-delay: 0.3s;
+}
+.animation-delay-400 {
+  animation-delay: 0.4s;
+}
+.animation-delay-500 {
+  animation-delay: 0.5s;
+}
+.animation-delay-700 {
+  animation-delay: 0.7s;
+}
