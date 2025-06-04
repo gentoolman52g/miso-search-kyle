@@ -15,31 +15,28 @@ async function fetchFromKnowledgeApi<T>(path: string, options: RequestInit = {})
     throw new Error("Knowledge API is not configured. Please check server logs.")
   }
 
-  // Ensure KNOWLEDGE_API_ENDPOINT does not end with a slash and path does not start with one, or handle appropriately.
-  // Assuming KNOWLEDGE_API_ENDPOINT is like "https://your-api.com" and path is like "/ext/v1/..."
-  const url = `${KNOWLEDGE_API_ENDPOINT.replace(/\/$/, "")}${path}`
+  const url = `${KNOWLEDGE_API_ENDPOINT.replace(/\/$/, "")}${path}` // path should start with /ext/v1
 
   const headers = {
     Authorization: `Bearer ${KNOWLEDGE_API_KEY}`,
-    "Content-Type": "application/json", // Usually for POST/PUT, but often sent for GET too
-    Accept: "application/json", // Explicitly request JSON response
+    "Content-Type": "application/json",
+    Accept: "application/json",
     ...options.headers,
   }
 
   console.log(`Calling MISO Knowledge API: ${options.method || "GET"} ${url}`)
 
   const response = await fetch(url, { ...options, headers })
-  const responseText = await response.text() // Get raw text first for debugging
+  const responseText = await response.text()
 
   if (!response.ok) {
     console.error(`MISO Knowledge API Error (${response.status}) for ${url}. Response Text: ${responseText}`)
     throw new Error(
-      `Knowledge API request failed: ${response.status} ${response.statusText}. Check server logs for response body.`,
+      `Knowledge API request failed: ${response.status} ${response.statusText}. Check server logs for response body. URL: ${url}`,
     )
   }
 
   if (response.status === 204 && !responseText) {
-    // Handle No Content
     console.log(`MISO Knowledge API: Received 204 No Content for ${url}`)
     return {} as T
   }
@@ -53,26 +50,32 @@ async function fetchFromKnowledgeApi<T>(path: string, options: RequestInit = {})
       `MISO Knowledge API: Failed to parse JSON response for ${url}. Error: ${e}. Response Text: ${responseText}`,
     )
     throw new Error(
-      `Knowledge API returned non-JSON response. Check if the endpoint is correct or if the API is down. Response starts with: ${responseText.substring(0, 200)}`,
+      `Knowledge API returned non-JSON response. Check if the endpoint is correct or if the API is down. URL: ${url}. Response starts with: ${responseText.substring(0, 200)}`,
     )
   }
 }
 
 /**
  * Fetches all documents within a given dataset.
+ * Path should be /ext/v1/datasets/{datasetId}/docs
  */
 async function getDocumentsInDataset(datasetId: string): Promise<MisoKnowledgeDocListItem[]> {
-  const response = await fetchFromKnowledgeApi<MisoKnowledgeDocListResponse>(`/datasets/${datasetId}/docs`)
+  // Corrected path to include /ext/v1/
+  const path = `/ext/v1/datasets/${datasetId}/docs`
+  console.log(`Constructed path for getDocumentsInDataset: ${path}`)
+  const response = await fetchFromKnowledgeApi<MisoKnowledgeDocListResponse>(path)
   return response.data || []
 }
 
 /**
  * Fetches all segments for a given document within a dataset.
+ * Path should be /ext/v1/datasets/{datasetId}/docs/{documentId}/segments
  */
 async function getSegmentsInDocument(datasetId: string, documentId: string): Promise<MisoKnowledgeSegmentDetail[]> {
-  const response = await fetchFromKnowledgeApi<MisoKnowledgeDocSegmentsResponse>(
-    `/ext/v1/datasets/${datasetId}/docs/${documentId}/segments`,
-  )
+  // Path is already correct here as it includes /ext/v1/
+  const path = `/ext/v1/datasets/${datasetId}/docs/${documentId}/segments`
+  console.log(`Constructed path for getSegmentsInDocument: ${path}`)
+  const response = await fetchFromKnowledgeApi<MisoKnowledgeDocSegmentsResponse>(path)
   return response.data || []
 }
 
@@ -84,10 +87,10 @@ export async function fetchSegmentDetails(
   const retrievedSegmentIds = new Set<string>()
 
   for (const datasetId of datasetIds) {
-    if (retrievedSegmentIds.size === targetSegmentIds.length && targetSegmentIds.length > 0) break // Optimization
+    if (retrievedSegmentIds.size === targetSegmentIds.length && targetSegmentIds.length > 0) break
 
     console.log(`Fetching documents for Dataset ID: ${datasetId}`)
-    const documents = await getDocumentsInDataset(datasetId)
+    const documents = await getDocumentsInDataset(datasetId) // This will now use the corrected path
     if (!documents || documents.length === 0) {
       console.log(`No documents found in dataset ${datasetId}`)
       continue
@@ -115,7 +118,7 @@ export async function fetchSegmentDetails(
       }
     }
   }
-  // Re-order segments to match the order from targetSegmentIds (workflow output)
+
   const orderedSegments = targetSegmentIds
     .map((id) => fetchedSegments.find((s) => s.id === id))
     .filter((s) => s !== undefined) as KnowledgeSegment[]
