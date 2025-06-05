@@ -155,4 +155,4 @@ export function parseSegmentContent(content: string): ParsedSegment | null {
 
   // 파싱할 수 없는 경우 null 반환
   return null
-} 
+}

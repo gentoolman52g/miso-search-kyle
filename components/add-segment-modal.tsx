@@ -1014,4 +1014,4 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
       </div>
     </div>
   )
-} 
+}
