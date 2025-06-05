@@ -10,6 +10,8 @@ import { parseSegmentContent, type ParsedSegment } from "@/lib/segment-parser"
 import { ParsedSegmentCard } from "@/components/parsed-segment-card"
 import { ParsedSegmentModal } from "@/components/parsed-segment-modal"
 import { SegmentModal, type EditSegmentData } from "@/components/add-segment-modal"
+import { DocumentDownloadButton } from "@/components/document-download-button"
+import { useProtectedAction } from "@/components/auth/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -357,14 +359,17 @@ const SearchResults = ({
                         onEditSegment(segment)
                       }}
                       className={`
-                        absolute top-2 right-2 z-10 p-1.5 rounded-lg
-                        bg-white/80 hover:bg-white border border-gray-200
-                        opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                        hover:shadow-md
+                        absolute bottom-3 right-3 z-10 px-3 py-2 rounded-lg
+                        bg-white/95 hover:bg-white border border-gray-200
+                        opacity-0 group-hover:opacity-100 transition-all duration-200
+                        hover:shadow-lg hover:scale-105 transform
+                        backdrop-blur-sm
+                        flex items-center gap-2
                       `}
                       title="세그먼트 수정"
                     >
                       <Edit className="h-3.5 w-3.5 text-gray-600" />
+                      <span className="text-xs font-medium text-gray-700">편집하기</span>
                     </button>
 
                     <CardHeader className="pb-3" onClick={() => openModal(segment)}>
@@ -741,6 +746,24 @@ const InitialKnowledge = ({
                 ))}
               </SelectContent>
             </Select>
+            
+            {/* 선택된 문서에 대한 다운로드 버튼 */}
+            {selectedDocumentId && selectedDocumentId !== "all" && (
+              (() => {
+                const selectedDoc = documents.find(doc => doc.id === selectedDocumentId);
+                return selectedDoc ? (
+                  <DocumentDownloadButton
+                    datasetId={selectedDoc.datasetId}
+                    documentId={selectedDoc.id}
+                    documentName={selectedDoc.name}
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl"
+                  />
+                ) : null;
+              })()
+            )}
+            
             <Button
               onClick={onAddSegment}
               className="rounded-xl"
@@ -800,14 +823,17 @@ const InitialKnowledge = ({
                         onEditSegment(segment)
                       }}
                       className={`
-                        absolute top-2 right-2 z-10 p-1.5 rounded-lg
-                        bg-white/80 hover:bg-white border border-gray-200
-                        opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                        hover:shadow-md
+                        absolute bottom-3 right-3 z-10 px-3 py-2 rounded-lg
+                        bg-white/95 hover:bg-white border border-gray-200
+                        opacity-0 group-hover:opacity-100 transition-all duration-200
+                        hover:shadow-lg hover:scale-105 transform
+                        backdrop-blur-sm
+                        flex items-center gap-2
                       `}
                       title="세그먼트 수정"
                     >
                       <Edit className="h-3.5 w-3.5 text-gray-600" />
+                      <span className="text-xs font-medium text-gray-700">편집하기</span>
                     </button>
 
                     <CardHeader className="pb-3" onClick={() => openModal(segment)}>
@@ -927,6 +953,9 @@ export default function MisoKnowledgeManagerClient() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>("all")
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true)
   const [isLoadingDocumentSegments, setIsLoadingDocumentSegments] = useState(false)
+
+  // 보호된 액션 훅
+  const { executeWithAuth, LoginModalComponent } = useProtectedAction()
 
   // 문서 목록 로드
   useEffect(() => {
@@ -1086,77 +1115,76 @@ export default function MisoKnowledgeManagerClient() {
 
   // 추가하기 모달 관련 핸들러
   const handleAddSegmentSuccess = useCallback(async () => {
-    // 성공 시 데이터 새로고침
-    if (selectedDocumentId === "all") {
-      // 전체 문서일 때는 초기 데이터 새로고침
-      setIsLoadingInitial(true)
-      setInitialError(null)
-      setLoadedSegmentIds(new Set())
-      setCurrentOffset(0)
-      
+    // 성공 시 모달만 닫고 화면은 새로고침하지 않음
+    // 새로 추가된 세그먼트는 다음 검색이나 필터링 시에 자연스럽게 나타남
+    console.log('세그먼트가 성공적으로 추가되었습니다.')
+    
+    // 만약 현재 특정 문서를 보고 있다면 해당 문서의 데이터만 새로고침
+    if (selectedDocumentId !== "all") {
+      // 부드럽게 해당 문서 데이터만 다시 로드
       try {
-        const result = await fetchInitialKnowledgeData(50, 0)
-        if (result.error) {
-          setInitialError(result.error)
-          setInitialData([])
-        } else if (result.data) {
-          const newLoadedIds = new Set<string>()
-          const uniqueSegments = result.data.filter(segment => {
-            if (!newLoadedIds.has(segment.id)) {
-              newLoadedIds.add(segment.id)
-              return true
-            }
-            return false
-          })
-          
-          setLoadedSegmentIds(newLoadedIds)
-          setInitialData(uniqueSegments)
-          setHasMoreData(result.hasMore || false)
-          setCurrentOffset(uniqueSegments.length)
+        const selectedDoc = documents.find(doc => doc.id === selectedDocumentId)
+        if (selectedDoc) {
+          const result = await fetchSegmentsByDocument(selectedDocumentId, selectedDoc.datasetId)
+          if (result.data) {
+            setInitialData(result.data)
+          }
         }
       } catch (error) {
-        console.error('Error refreshing initial data:', error)
-        setInitialError('데이터를 새로고침하는 중 문제가 발생했습니다.')
-      } finally {
-        setIsLoadingInitial(false)
+        console.error('Error refreshing document segments:', error)
       }
-    } else {
-      // 특정 문서일 때는 해당 문서 데이터 새로고침
-      handleDocumentChange(selectedDocumentId)
     }
-  }, [selectedDocumentId, handleDocumentChange])
+  }, [selectedDocumentId, documents])
 
   // 편집 세그먼트 핸들러
   const handleEditSegment = useCallback((segment: KnowledgeSegment) => {
-    if (!segment.documentId) {
-      console.error('No document ID found for segment')
-      return
-    }
+    executeWithAuth(() => {
+      if (!segment.documentId) {
+        console.error('No document ID found for segment')
+        return
+      }
 
-    // 세그먼트가 속한 문서의 데이터셋 ID 찾기
-    const document = documents.find(doc => doc.id === segment.documentId)
-    if (!document) {
-      console.error('Document not found for segment')
-      return
-    }
+      // 세그먼트가 속한 문서의 데이터셋 ID 찾기
+      const document = documents.find(doc => doc.id === segment.documentId)
+      if (!document) {
+        console.error('Document not found for segment')
+        return
+      }
 
-    setEditSegmentData({
-      id: segment.id,
-      documentId: segment.documentId,
-      datasetId: document.datasetId,
-      content: segment.content || '',
-      answer: segment.answer,
-      keywords: segment.keywords
+      setEditSegmentData({
+        id: segment.id,
+        documentId: segment.documentId,
+        datasetId: document.datasetId,
+        content: segment.content || '',
+        answer: segment.answer,
+        keywords: segment.keywords
+      })
+      setIsEditModalOpen(true)
     })
-    setIsEditModalOpen(true)
-  }, [documents])
+  }, [documents, executeWithAuth])
 
   // 편집 성공 핸들러 (추가와 동일한 로직 사용)
   const handleEditSegmentSuccess = useCallback(async () => {
     setIsEditModalOpen(false)
     setEditSegmentData(undefined)
-    await handleAddSegmentSuccess() // 동일한 새로고침 로직 사용
-  }, [handleAddSegmentSuccess])
+    
+    console.log('세그먼트가 성공적으로 수정되었습니다.')
+    
+    // 현재 특정 문서를 보고 있다면 해당 문서의 데이터만 새로고침
+    if (selectedDocumentId !== "all") {
+      try {
+        const selectedDoc = documents.find(doc => doc.id === selectedDocumentId)
+        if (selectedDoc) {
+          const result = await fetchSegmentsByDocument(selectedDocumentId, selectedDoc.datasetId)
+          if (result.data) {
+            setInitialData(result.data)
+          }
+        }
+      } catch (error) {
+        console.error('Error refreshing document segments after edit:', error)
+      }
+    }
+  }, [selectedDocumentId, documents])
 
   return (
     <main className="flex flex-col items-center justify-start min-h-screen pt-16 pb-24 px-6 bg-gradient-to-br from-background via-background to-muted/20 selection:bg-accent/30 selection:text-accent-foreground">
@@ -1190,7 +1218,7 @@ export default function MisoKnowledgeManagerClient() {
           onLoadMore={handleLoadMore}
           hasMore={hasMoreData}
           isLoadingMore={isLoadingMore}
-          onAddSegment={() => setIsAddModalOpen(true)}
+          onAddSegment={() => executeWithAuth(() => setIsAddModalOpen(true))}
           onEditSegment={handleEditSegment}
           selectedDocumentId={selectedDocumentId}
           onDocumentChange={handleDocumentChange}
@@ -1220,6 +1248,9 @@ export default function MisoKnowledgeManagerClient() {
       <footer className="fixed bottom-0 left-0 right-0 h-12 flex items-center justify-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t border-border/20">
         <p className="text-xs text-muted-foreground">Made by GS E&R Unit</p>
       </footer>
+
+      {/* LoginModalComponent를 표시 */}
+      <LoginModalComponent />
     </main>
   )
 }

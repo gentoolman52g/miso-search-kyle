@@ -185,6 +185,7 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
   const isEditMode = !!editSegment
   const [segmentType, setSegmentType] = useState<SegmentType>('regulation')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
   // 문서 관련 상태
@@ -257,6 +258,7 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
   const resetAllStates = useCallback(() => {
     setSegmentType('regulation')
     setIsSubmitting(false)
+    setIsSuccess(false)
     setError(null)
     if (!isEditMode) {
       setSelectedDocumentId('')
@@ -516,8 +518,20 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
       if (result.error) {
         setError(result.error)
       } else {
+        // 성공 시 성공 메시지를 잠깐 보여주고 모달 닫기
+        setError(null)
+        setIsSubmitting(false)
+        setIsSuccess(true)
+        
+        // 성공 콜백 호출
         onSuccess()
-        handleClose()
+        
+        // 약간의 지연 후 모달 닫기 (사용자가 성공을 인지할 수 있도록)
+        setTimeout(() => {
+          handleClose()
+        }, 800)
+        
+        return // early return으로 finally 블록의 setIsSubmitting(false) 방지
       }
     } catch (error) {
       setError(`세그먼트 ${isEditMode ? '수정' : '추가'} 중 오류가 발생했습니다.`)
@@ -975,10 +989,15 @@ export const SegmentModal: React.FC<SegmentModalProps> = ({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!isFormValid() || isSubmitting}
+              disabled={!isFormValid() || isSubmitting || isSuccess}
               className="px-6 h-11 bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]"
             >
-              {isSubmitting ? (
+              {isSuccess ? (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2 text-white" />
+                  완료!
+                </>
+              ) : isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   {isEditMode ? '수정하는 중...' : '추가하는 중...'}
